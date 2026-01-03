@@ -4,29 +4,42 @@ const billingEmitter = require('../events/eventEmitter');
 // @desc    Get all bills for a user
 // @route   GET /api/billing
 // @access  Protected
+// GET /api/billing
 const getUserBills = async (req, res) => {
-  const userId = req.user._id;
-  const bills = await Bill.find({ userId }).sort({ billingMonth: -1 });
-  res.json(bills);
+  try {
+    const userId = req.userId; // from middleware
+
+    const bills = await Bill.find({ userId }).sort({ billingMonth: -1 });
+    res.json(bills);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
 // @desc    Generate a new bill (admin / mock)
 // @route   POST /api/billing
 // @access  Protected
 const generateBill = async (req, res) => {
-  const { userId, billingMonth, amount, details } = req.body;
+  try {
+    const userId = req.userId; //  MUST be ObjectId string
+    const { billingMonth, amount } = req.body;
 
-  const bill = await Bill.create({
-    userId,
-    billingMonth,
-    amount,
-    details,
-  });
+    if (!billingMonth) {
+      return res.status(400).json({ message: 'billingMonth is required' });
+    }
 
-  // Emit event for Notification Service
-  billingEmitter.emit('billGenerated', { userId, billingMonth, amount });
+    const bill = await Bill.create({
+      userId,
+      billingMonth,
+      amount: amount || 0,
+      status: 'unpaid',
+    });
 
-  res.status(201).json(bill);
+    // Later: emit billGenerated event
+    res.status(201).json(bill);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
 };
 
 module.exports = {

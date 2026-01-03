@@ -1,9 +1,11 @@
-const express = require('express');
 const dotenv = require('dotenv');
+dotenv.config();
+
+const express = require('express');
 const cors = require('cors');
 const gatewayRoutes = require('./routes/gatewayRoutes');
 
-dotenv.config();
+
 const app = express();
 
 // Middleware

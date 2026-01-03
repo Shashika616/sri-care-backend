@@ -1,30 +1,35 @@
 // src/middleware/authMiddleware.js
-const jwt = require('jsonwebtoken');
+require('dotenv').config();
+const mongoose = require('mongoose');
 
+const GATEWAY_SECRET = process.env.GATEWAY_SECRET;
+console.log("gateway secrent in billing",GATEWAY_SECRET );
 const protect = (req, res, next) => {
-  let token;
+  const userId = req.headers['x-user-id'];
+  const gatewaySecret = req.headers['x-gateway-secret'];
+  console.log("Forwarding headers:", {
+  "x-user-id": userId,
+  "x-gateway-secret": gatewaySecret
+});
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  // // Ensure secret matches (trust check)
+  // if (!gatewaySecret || gatewaySecret !== GATEWAY_SECRET) {
+  //   return res.status(401).json({ message: 'Not authorized, invalid gateway secret' });
+  // }
 
-      // Attach user info from JWT payload
-      req.user = { _id: decoded.id, email: decoded.email }; 
-
-      next();
-    } catch (error) {
-      console.error(error);
-      return res.status(401).json({ message: 'Not authorized, token failed' });
-    }
+  // Ensure userId exists
+  if (!userId) {
+    return res.status(401).json({ message: 'x-user-id header missing' });
   }
 
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
+  // Validate MongoDB ObjectId
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: 'Invalid userId format' });
   }
+
+  // Attach userId to request
+  req.userId = userId;
+  next();
 };
 
 module.exports = { protect };

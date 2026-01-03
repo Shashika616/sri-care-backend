@@ -1,10 +1,12 @@
+dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
-const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const billingRoutes = require('./routes/billingRoutes');
 const billingEmitter = require('./events/eventEmitter');
 
-dotenv.config();
+
 
 connectDB();
 
