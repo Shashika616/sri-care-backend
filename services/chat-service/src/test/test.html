@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Service Test Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .test-panel {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .test-panel h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 600;
+    }
+
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    .input-group input:focus, .input-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-success {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #38a169;
+      transform: translateY(-2px);
+    }
+
+    .btn-danger {
+      background: #f56565;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #e53e3e;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: #718096;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #4a5568;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .status.connected {
+      background: #c6f6d5;
+      color: #22543d;
+      border-left: 4px solid #48bb78;
+    }
+
+    .status.disconnected {
+      background: #fed7d7;
+      color: #742a2a;
+      border-left: 4px solid #f56565;
+    }
+
+    .status.queued {
+      background: #feebc8;
+      color: #7c2d12;
+      border-left: 4px solid #ed8936;
+    }
+
+    .chat-box {
+      height: 300px;
+      overflow-y: auto;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #f7fafc;
+    }
+
+    .message {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+
+    .message.customer {
+      background: #bee3f8;
+      margin-left: auto;
+      text-align: right;
+    }
+
+    .message.agent {
+      background: #c6f6d5;
+    }
+
+    .message.system {
+      background: #e2e8f0;
+      text-align: center;
+      margin: 10px auto;
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    .message-meta {
+      font-size: 11px;
+      color: #718096;
+      margin-top: 4px;
+    }
+
+    .events-log {
+      height: 200px;
+      overflow-y: auto;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 12px;
+      background: #1a202c;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      margin-top: 15px;
+    }
+
+    .event-log-entry {
+      margin-bottom: 5px;
+      padding: 4px;
+      border-radius: 3px;
+    }
+
+    .event-log-entry.success {
+      color: #48bb78;
+    }
+
+    .event-log-entry.error {
+      color: #f56565;
+    }
+
+    .event-log-entry.info {
+      color: #63b3ed;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .typing-indicator {
+      padding: 8px 12px;
+      background: #edf2f7;
+      border-radius: 8px;
+      font-style: italic;
+      color: #718096;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Chat Service Test Dashboard</h1>
+
+    <div class="test-grid">
+      <!-- Customer Test Panel -->
+      <div class="test-panel">
+        <h2>👤 Customer Test</h2>
+        
+        <div id="customerStatus" class="status disconnected">
+          Disconnected
+        </div>
+
+        <div class="input-group">
+          <label>Customer Name:</label>
+          <input type="text" id="customerName" value="Test Customer" placeholder="Enter your name">
+        </div>
+
+        <div class="input-group">
+          <label>Customer ID:</label>
+          <input type="text" id="customerId" value="customer_test_001" placeholder="Unique customer ID">
+        </div>
+
+        <button class="btn btn-primary" id="customerConnect">Connect as Customer</button>
+        <button class="btn btn-danger" id="customerDisconnect" disabled>Disconnect</button>
+
+        <div class="chat-box" id="customerChatBox"></div>
+
+        <div id="customerTyping" class="typing-indicator" style="display: none;"></div>
+
+        <div class="input-group">
+          <input type="text" id="customerMessage" placeholder="Type a message..." disabled>
+        </div>
+
+        <button class="btn btn-success" id="customerSend" disabled>Send Message</button>
+      </div>
+
+      <!-- Agent Test Panel -->
+      <div class="test-panel">
+        <h2>👨‍💼 Agent Test</h2>
+        
+        <div id="agentStatus" class="status disconnected">
+          Disconnected
+        </div>
+
+        <div class="input-group">
+          <label>Agent Name:</label>
+          <input type="text" id="agentName" value="Test Agent" placeholder="Enter agent name">
+        </div>
+
+        <div class="input-group">
+          <label>Agent ID:</label>
+          <input type="text" id="agentId" value="agent_test_001" placeholder="Unique agent ID">
+        </div>
+
+        <button class="btn btn-primary" id="agentConnect">Go Online</button>
+        <button class="btn btn-danger" id="agentDisconnect" disabled>Go Offline</button>
+
+        <div class="input-group" id="agentRoomSelector" style="display: none;">
+          <label>Active Chats:</label>
+          <select id="agentRooms">
+            <option value="">Select a chat...</option>
+          </select>
+        </div>
+
+        <div class="chat-box" id="agentChatBox"></div>
+
+        <div id="agentTyping" class="typing-indicator" style="display: none;"></div>
+
+        <div class="input-group">
+          <input type="text" id="agentMessage" placeholder="Type a message..." disabled>
+        </div>
+
+        <button class="btn btn-success" id="agentSend" disabled>Send Message</button>
+        <button class="btn btn-secondary" id="agentClose" disabled>Close Chat</button>
+      </div>
+    </div>
+
+    <!-- Statistics Panel -->
+    <div class="test-panel">
+      <h2>📊 System Statistics</h2>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statActive">0</div>
+          <div class="stat-label">Active Sessions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statQueue">0</div>
+          <div class="stat-label">Queue Length</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statMessages">0</div>
+          <div class="stat-label">Total Messages</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statConnections">0</div>
+          <div class="stat-label">Connections</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="refreshStats">Refresh Statistics</button>
+      <button class="btn btn-secondary" id="clearLog">Clear Event Log</button>
+
+      <div class="events-log" id="eventsLog"></div>
+    </div>
+  </div>
+
+  <script>
+    const SERVER_URL = 'http://localhost:4000';
+    
+    let customerSocket = null;
+    let agentSocket = null;
+    let currentCustomerRoom = null;
+    let currentAgentRoom = null;
+    let messageCount = 0;
+    let connectionCount = 0;
+
+    // Utility Functions
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('eventsLog');
+      const entry = document.createElement('div');
+      entry.className = `event-log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function addMessage(chatBoxId, message, role, sender) {
+      const chatBox = document.getElementById(chatBoxId);
+      const msgEl = document.createElement('div');
+      msgEl.className = `message ${role}`;
+      msgEl.innerHTML = `
+        <div>${message}</div>
+        <div class="message-meta">${sender} • ${new Date().toLocaleTimeString()}</div>
+      `;
+      chatBox.appendChild(msgEl);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      messageCount++;
+      document.getElementById('statMessages').textContent = messageCount;
+    }
+
+    // Customer Functions
+    document.getElementById('customerConnect').addEventListener('click', () => {
+      const name = document.getElementById('customerName').value;
+      const id = document.getElementById('customerId').value;
+
+      if (!name || !id) {
+        alert('Please enter both name and ID');
+        return;
+      }
+
+      customerSocket = io(SERVER_URL);
+
+      customerSocket.on('connect', () => {
+        log('Customer connected', 'success');
+        connectionCount++;
+        document.getElementById('statConnections').textContent = connectionCount;
+        
+        customerSocket.emit('customer:join', {
+          customerId: id,
+          customerName: name
+        });
+
+        currentCustomerRoom = `room_${id}`;
+        
+        document.getElementById('customerStatus').className = 'status connected';
+        document.getElementById('customerStatus').textContent = 'Connected - Waiting...';
+        document.getElementById('customerConnect').disabled = true;
+        document.getElementById('customerDisconnect').disabled = false;
+        document.getElementById('customerMessage').disabled = false;
+        document.getElementById('customerSend').disabled = false;
+      });
+
+      customerSocket.on('customer:queued', (data) => {
+        log(`Customer queued at position ${data.position}`, 'info');
+        document.getElementById('customerStatus').className = 'status queued';
+        document.getElementById('customerStatus').textContent = `Queued - Position: ${data.position}`;
+        addMessage('customerChatBox', data.message, 'system', 'System');
+      });
+
+      customerSocket.on('customer:agent-assigned', (data) => {
+        log(`Agent assigned: ${data.agentId}`, 'success');
+        document.getElementById('customerStatus').className = 'status connected';
+        document.getElementById('customerStatus').textContent = `Connected - Agent: ${data.agentName || data.agentId}`;
+        addMessage('customerChatBox', data.message, 'system', 'System');
+      });
+
+      customerSocket.on('message:received', (data) => {
+        if (data.senderRole !== 'customer') {
+          addMessage('customerChatBox', data.message, data.senderRole, data.senderName);
+        }
+      });
+
+      customerSocket.on('user:typing', (data) => {
+        const typingEl = document.getElementById('customerTyping');
+        typingEl.textContent = `${data.userName} is typing...`;
+        typingEl.style.display = 'block';
+      });
+
+      customerSocket.on('user:stopped-typing', () => {
+        document.getElementById('customerTyping').style.display = 'none';
+      });
+
+      customerSocket.on('chat:closed', (data) => {
+        log('Chat closed: ' + data.reason, 'info');
+        addMessage('customerChatBox', `Chat closed: ${data.reason}`, 'system', 'System');
+      });
+
+      customerSocket.on('error', (data) => {
+        log('Error: ' + data.message, 'error');
+      });
+    });
+
+    document.getElementById('customerDisconnect').addEventListener('click', () => {
+      if (customerSocket) {
+        customerSocket.disconnect();
+        customerSocket = null;
+        connectionCount--;
+        document.getElementById('statConnections').textContent = connectionCount;
+        document.getElementById('customerStatus').className = 'status disconnected';
+        document.getElementById('customerStatus').textContent = 'Disconnected';
+        document.getElementById('customerConnect').disabled = false;
+        document.getElementById('customerDisconnect').disabled = true;
+        document.getElementById('customerMessage').disabled = true;
+        document.getElementById('customerSend').disabled = true;
+        log('Customer disconnected', 'info');
+      }
+    });
+
+    document.getElementById('customerSend').addEventListener('click', () => {
+      const message = document.getElementById('customerMessage').value;
+      if (!message || !customerSocket) return;
+
+      customerSocket.emit('message:send', {
+        roomId: currentCustomerRoom,
+        message: message,
+        recipientId: 'agent'
+      }, (response) => {
+        if (response.success) {
+          addMessage('customerChatBox', message, 'customer', 'You');
+          document.getElementById('customerMessage').value = '';
+        }
+      });
+    });
+
+    document.getElementById('customerMessage').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('customerSend').click();
+      }
+    });
+
+    // Agent Functions
+    document.getElementById('agentConnect').addEventListener('click', () => {
+      const name = document.getElementById('agentName').value;
+      const id = document.getElementById('agentId').value;
+
+      if (!name || !id) {
+        alert('Please enter both name and ID');
+        return;
+      }
+
+      agentSocket = io(SERVER_URL);
+
+      agentSocket.on('connect', () => {
+        log('Agent connected', 'success');
+        connectionCount++;
+        document.getElementById('statConnections').textContent = connectionCount;
+        
+        agentSocket.emit('agent:online', {
+          agentId: id,
+          agentName: name
+        });
+
+        document.getElementById('agentStatus').className = 'status connected';
+        document.getElementById('agentStatus').textContent = 'Online - Ready';
+        document.getElementById('agentConnect').disabled = true;
+        document.getElementById('agentDisconnect').disabled = false;
+        document.getElementById('agentRoomSelector').style.display = 'block';
+      });
+
+      agentSocket.on('agent:new-customer', (data) => {
+        log(`New customer assigned: ${data.customerName}`, 'success');
+        
+        const select = document.getElementById('agentRooms');
+        const option = document.createElement('option');
+        option.value = data.roomId;
+        option.textContent = `${data.customerName} (${data.roomId})`;
+        select.appendChild(option);
+        
+        addMessage('agentChatBox', `New customer: ${data.customerName}`, 'system', 'System');
+      });
+
+      agentSocket.on('message:received', (data) => {
+        if (data.senderRole !== 'agent') {
+          addMessage('agentChatBox', data.message, data.senderRole, data.senderName);
+        }
+      });
+
+      agentSocket.on('user:typing', (data) => {
+        const typingEl = document.getElementById('agentTyping');
+        typingEl.textContent = `${data.userName} is typing...`;
+        typingEl.style.display = 'block';
+      });
+
+      agentSocket.on('user:stopped-typing', () => {
+        document.getElementById('agentTyping').style.display = 'none';
+      });
+
+      agentSocket.on('error', (data) => {
+        log('Error: ' + data.message, 'error');
+      });
+    });
+
+    document.getElementById('agentRooms').addEventListener('change', (e) => {
+      const roomId = e.target.value;
+      if (roomId && agentSocket) {
+        currentAgentRoom = roomId;
+        agentSocket.emit('agent:join-room', { roomId });
+        log(`Joined room: ${roomId}`, 'info');
+        document.getElementById('agentMessage').disabled = false;
+        document.getElementById('agentSend').disabled = false;
+        document.getElementById('agentClose').disabled = false;
+      }
+    });
+
+    document.getElementById('agentDisconnect').addEventListener('click', () => {
+      if (agentSocket) {
+        agentSocket.disconnect();
+        agentSocket = null;
+        connectionCount--;
+        document.getElementById('statConnections').textContent = connectionCount;
+        document.getElementById('agentStatus').className = 'status disconnected';
+        document.getElementById('agentStatus').textContent = 'Offline';
+        document.getElementById('agentConnect').disabled = false;
+        document.getElementById('agentDisconnect').disabled = true;
+        document.getElementById('agentMessage').disabled = true;
+        document.getElementById('agentSend').disabled = true;
+        document.getElementById('agentClose').disabled = true;
+        document.getElementById('agentRoomSelector').style.display = 'none';
+        log('Agent disconnected', 'info');
+      }
+    });
+
+    document.getElementById('agentSend').addEventListener('click', () => {
+      const message = document.getElementById('agentMessage').value;
+      if (!message || !agentSocket || !currentAgentRoom) return;
+
+      agentSocket.emit('message:send', {
+        roomId: currentAgentRoom,
+        message: message,
+        recipientId: 'customer'
+      }, (response) => {
+        if (response.success) {
+          addMessage('agentChatBox', message, 'agent', 'You');
+          document.getElementById('agentMessage').value = '';
+        }
+      });
+    });
+
+    document.getElementById('agentClose').addEventListener('click', () => {
+      if (!agentSocket || !currentAgentRoom) return;
+      
+      agentSocket.emit('agent:close-chat', {
+        roomId: currentAgentRoom,
+        reason: 'resolved'
+      });
+      
+      log(`Closed chat: ${currentAgentRoom}`, 'info');
+      addMessage('agentChatBox', 'Chat closed', 'system', 'System');
+    });
+
+    document.getElementById('agentMessage').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('agentSend').click();
+      }
+    });
+
+    // Statistics
+    document.getElementById('refreshStats').addEventListener('click', async () => {
+      try {
+        const [sessions, queue] = await Promise.all([
+          fetch(`${SERVER_URL}/api/sessions/active`).then(r => r.json()),
+          fetch(`${SERVER_URL}/api/queue/status`).then(r => r.json())
+        ]);
+        
+        document.getElementById('statActive').textContent = sessions.count || 0;
+        document.getElementById('statQueue').textContent = queue.queueLength || 0;
+        log('Statistics refreshed', 'success');
+      } catch (error) {
+        log('Failed to refresh statistics: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('clearLog').addEventListener('click', () => {
+      document.getElementById('eventsLog').innerHTML = '';
+      log('Event log cleared', 'info');
+    });
+
+    // Auto-refresh stats
+    setInterval(() => {
+      document.getElementById('refreshStats').click();
+    }, 5000);
+
+    log('Test dashboard ready', 'success');
+  </script>
+</body>
+</html>
