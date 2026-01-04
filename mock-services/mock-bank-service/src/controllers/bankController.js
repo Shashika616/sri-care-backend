@@ -1,75 +1,79 @@
 const Card = require('../models/cardModel');
+const BankTransaction = require('../models/bankTransactionModel');
 const generateOTP = require('../utils/otpGenerator');
 const { sendEmailOTP, sendSmsOTP } = require('../utils/otpSender');
 
-
 // POST /bank/validate-card
 const validateCard = async (req, res) => {
-  const { cardNumber, expiry, cvv, amount } = req.body;
+  const { cardNumber, expiry, cvv, amount, providerRef } = req.body;
 
-  if (!cardNumber || !expiry || !cvv || !amount) {
+  if (!cardNumber || !expiry || !cvv || !amount || !providerRef) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   const card = await Card.findOne({ cardNumber, expiry, cvv });
-  if (!card) {
-    return res.status(404).json({ message: 'Card not found' });
-  }
+  if (!card) return res.status(404).json({ message: 'Card not found' });
+  if (card.availableBalance < amount) return res.status(402).json({ message: 'Insufficient balance' });
 
-  if (card.availableBalance < amount) {
-    return res.status(402).json({ message: 'Insufficient balance' });
-  }
-
-  // Generate OTP
+  // Create bank transaction
   const otp = generateOTP();
-  card.otp = otp;
-  card.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
-  await card.save();
+  const txn = await BankTransaction.create({
+    providerRef,
+    cardNumber,
+    amount,
+    otp,
+    otpExpires: new Date(Date.now() + 5 * 60 * 1000), // 5 min
+    otpAttempts: 0,
+  });
 
   // Send OTP
-  if (card.email) {
-    sendEmailOTP(card.email, otp); // async
-  }
-  if (card.phone) {
-    sendSmsOTP(card.phone, otp);   // async
-  }
+  if (card.email) sendEmailOTP(card.email, otp);
+  if (card.phone) sendSmsOTP(card.phone, otp);
 
   res.json({
-    otpRef: otp, // you can also return a ref ID if you want more abstraction
-    transactionRef: `BANK-${Date.now()}`,
+    transactionRef: providerRef,
     message: 'OTP sent to user via available channels',
+    otpSent: true
   });
 };
 
-
 // POST /bank/verify-otp
 const verifyOtp = async (req, res) => {
-  const { cardNumber, otp, amount } = req.body;
+  const { providerRef, otp } = req.body;
 
-  if (!cardNumber || !otp || !amount) {
-    return res.status(400).json({ message: 'Missing required fields' });
+  if (!providerRef || !otp) return res.status(400).json({ message: 'Missing required fields' });
+
+  const txn = await BankTransaction.findOne({ providerRef, status: 'PENDING' });
+  if (!txn) return res.status(404).json({ status: 'FAILED', message: 'Invalid providerRef' });
+
+  const card = await Card.findOne({ cardNumber: txn.cardNumber });
+  if (!card) return res.status(404).json({ status: 'FAILED', message: 'Card not found' });
+
+  // Check OTP attempts limit
+  if (txn.otpAttempts >= 3) {
+    txn.status = 'FAILED';
+    await txn.save();
+    return res.status(403).json({ status: 'FAILED', message: 'OTP attempt limit exceeded' });
   }
 
-  const card = await Card.findOne({ cardNumber });
-  if (!card) {
-    return res.status(404).json({ message: 'Card not found' });
-  }
-
-  if (!card.otp || card.otp !== otp || card.otpExpires < new Date()) {
+  // Verify OTP
+  if (txn.otp !== otp || txn.otpExpires < new Date()) {
+    txn.otpAttempts += 1; // Increment attempt count
+    await txn.save();
     return res.status(400).json({ status: 'FAILED', message: 'Invalid or expired OTP' });
   }
 
   // Deduct balance
-  card.availableBalance -= amount;
-  card.otp = null;
-  card.otpExpires = null;
+  card.availableBalance -= txn.amount;
   await card.save();
 
-  res.json({
-    status: 'SUCCESS',
-    message: 'Payment approved',
-    transactionRef: `BANK-${Date.now()}`,
-  });
+  txn.status = 'SUCCESS';
+  txn.otp = null;
+  txn.otpExpires = null;
+  txn.otpAttempts = 0;
+  await txn.save();
+
+  res.json({ status: 'SUCCESS', message: 'Payment approved', transactionRef: providerRef });
 };
 
 // GET /bank/balance/:cardNumber

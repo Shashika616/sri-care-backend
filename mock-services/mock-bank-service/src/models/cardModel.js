@@ -8,8 +8,6 @@ const cardSchema = new mongoose.Schema({
   email: { type: String },
   phone: { type: String },
   availableBalance: { type: Number, required: true, default: 0 },
-  otp: { type: String }, // Store current OTP for verification
-  otpExpires: { type: Date },
 });
 
 module.exports = mongoose.model('Card', cardSchema);

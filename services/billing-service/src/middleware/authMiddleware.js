@@ -7,10 +7,6 @@ console.log("gateway secrent in billing",GATEWAY_SECRET );
 const protect = (req, res, next) => {
   const userId = req.headers['x-user-id'];
   const gatewaySecret = req.headers['x-gateway-secret'];
-  console.log("Forwarding headers:", {
-  "x-user-id": userId,
-  "x-gateway-secret": gatewaySecret
-});
 
   // // Ensure secret matches (trust check)
   // if (!gatewaySecret || gatewaySecret !== GATEWAY_SECRET) {
@@ -31,5 +27,7 @@ const protect = (req, res, next) => {
   req.userId = userId;
   next();
 };
+
+
 
 module.exports = { protect };

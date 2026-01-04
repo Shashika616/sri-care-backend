@@ -12,15 +12,19 @@ router.post('/pay', async (req, res) => {
   }
 
   try {
-    // 1 Forward payment request to Bank Service
+    // Generate a unique providerRef for this transaction
+    const providerRef = `BANK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // Forward payment request to Bank Service
     const bankResponse = await axios.post(`${process.env.BANK_URL}/bank/validate-card`, {
       amount,
       cardNumber,
       expiry,
       cvv,
+      providerRef, // now defined
     });
 
-    // 2 Return the response to Payment Service
+    // Return the response to Payment Service
     res.status(200).json({
       status: 'PENDING',           // OTP verification needed
       transactionRef: bankResponse.data.transactionRef,
@@ -36,5 +40,37 @@ router.post('/pay', async (req, res) => {
     });
   }
 });
+
+
+router.post('/verify-otp', async (req, res) => {
+  const { providerRef, otp } = req.body;
+
+  if (!providerRef || !otp) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    // Forward OTP verification to Bank
+    const bankResponse = await axios.post(
+      `${process.env.BANK_URL}/bank/verify-otp`,
+      { providerRef, otp }
+    );
+
+    return res.status(200).json({
+      status: bankResponse.data.status,
+      transactionRef: bankResponse.data.transactionRef,
+      message: bankResponse.data.message
+    });
+
+  } catch (err) {
+    console.error('OTP verification failed:', err.message);
+
+    return res.status(400).json({
+      status: 'FAILED',
+      message: 'OTP verification failed'
+    });
+  }
+});
+
 
 module.exports = router;

@@ -42,7 +42,42 @@ const generateBill = async (req, res) => {
   }
 };
 
+// @desc    Mark a bill as paid (called by Payment Service)
+// @route   POST /api/billing/mark-paid
+// @access  Internal (can use a gateway secret)
+const markBillPaid = async (req, res) => {
+  try {
+    const { billId } = req.body;
+    console.log("Bill ID: ", billId);
+
+    if (!billId) {
+      return res.status(400).json({ message: 'billId is required' });
+    }
+
+    const bill = await Bill.findById(billId);
+    if (!bill) {
+      return res.status(404).json({ message: 'Bill not found' });
+    }
+
+    // Only update if unpaid
+    if (bill.status === 'paid') {
+      return res.status(200).json({ message: 'Bill already paid' });
+    }
+
+    bill.status = 'paid';
+    await bill.save();
+
+    // Optional: emit event for other services
+    billingEmitter.emit('billPaid', { billId: bill._id, userId: bill.userId, amount: bill.amount });
+
+    res.json({ message: 'Bill marked as paid', bill });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getUserBills,
   generateBill,
+  markBillPaid,
 };
