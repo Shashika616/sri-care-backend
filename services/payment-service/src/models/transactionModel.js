@@ -17,7 +17,11 @@ const transactionSchema = mongoose.Schema(
       required: true,
       unique: true
     },
-
+    paymentStage: {
+      type: String,
+      enum: ['OTP_PENDING', 'BANK_CONFIRMED', 'BUSINESS_DONE'],
+      default: 'OTP_PENDING'
+    },
     status: { type: String, enum: ['SUCCESS', 'FAILED', 'PENDING', 'COMPLETED', 'ROLLED_BACK'], required: true },
     providerRef: { type: String }, // Reference ID from mock gateway
   },

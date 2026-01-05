@@ -24,6 +24,7 @@ const validateCard = async (req, res) => {
     otp,
     otpExpires: new Date(Date.now() + 5 * 60 * 1000), // 5 min
     otpAttempts: 0,
+    status: 'PENDING',
   });
 
   // Send OTP
@@ -43,11 +44,15 @@ const verifyOtp = async (req, res) => {
 
   if (!providerRef || !otp) return res.status(400).json({ message: 'Missing required fields' });
 
-  const txn = await BankTransaction.findOne({ providerRef, status: 'PENDING' });
+  const txn = await BankTransaction.findOne({ providerRef });
   if (!txn) return res.status(404).json({ status: 'FAILED', message: 'Invalid providerRef' });
 
-  const card = await Card.findOne({ cardNumber: txn.cardNumber });
-  if (!card) return res.status(404).json({ status: 'FAILED', message: 'Card not found' });
+    if (txn.status !== 'PENDING') {
+    return res.status(400).json({
+      status: 'FAILED',
+      message: `Transaction already ${txn.status}`,
+    });
+  }
 
   // Check OTP attempts limit
   if (txn.otpAttempts >= 3) {
@@ -56,12 +61,31 @@ const verifyOtp = async (req, res) => {
     return res.status(403).json({ status: 'FAILED', message: 'OTP attempt limit exceeded' });
   }
 
-  // Verify OTP
-  if (txn.otp !== otp || txn.otpExpires < new Date()) {
-    txn.otpAttempts += 1; // Increment attempt count
+   // Invalid or expired OTP
+    if (txn.otp !== otp || txn.otpExpires < new Date()) {
+    txn.otpAttempts += 1;
     await txn.save();
-    return res.status(400).json({ status: 'FAILED', message: 'Invalid or expired OTP' });
+
+    const attemptsLeft = 3 - txn.otpAttempts;
+
+    if (attemptsLeft <= 0) {
+      txn.status = 'FAILED';
+      await txn.save();
+      return res.status(403).json({
+        status: 'FAILED',
+        message: 'OTP attempt limit exceeded'
+      });
+    }
+
+    return res.status(400).json({
+      status: 'INVALID_OTP',
+      message: 'Invalid OTP',
+      attemptsLeft
+    });
   }
+
+  const card = await Card.findOne({ cardNumber: txn.cardNumber });
+  if (!card) return res.status(404).json({ status: 'FAILED', message: 'Card not found' });
 
   // Deduct balance
   card.availableBalance -= txn.amount;
@@ -85,4 +109,57 @@ const getBalance = async (req, res) => {
   res.json({ availableBalance: card.availableBalance });
 };
 
-module.exports = { validateCard, verifyOtp, getBalance };
+// POST /bank/rollback
+const rollbackTransaction = async (req, res) => {
+  const { providerRef, amount } = req.body;
+
+  if (!providerRef || !amount) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Find successful transaction
+  const txn = await BankTransaction.findOne({
+    providerRef,
+    status: 'SUCCESS'
+  });
+
+  if (!txn) {
+    return res.status(404).json({
+      status: 'FAILED',
+      message: 'Transaction not found or not eligible for rollback'
+    });
+  }
+
+  // Prevent double rollback
+  if (txn.status === 'ROLLED_BACK') {
+    return res.status(409).json({
+      status: 'FAILED',
+      message: 'Transaction already rolled back'
+    });
+  }
+
+  const card = await Card.findOne({ cardNumber: txn.cardNumber });
+  if (!card) {
+    return res.status(404).json({
+      status: 'FAILED',
+      message: 'Card not found'
+    });
+  }
+
+  //  Credit back the amount
+  card.availableBalance += amount;
+  await card.save();
+
+  // Mark transaction rolled back
+  txn.status = 'ROLLED_BACK';
+  await txn.save();
+
+  return res.json({
+    status: 'SUCCESS',
+    message: 'Transaction rolled back successfully',
+    transactionRef: providerRef
+  });
+};
+
+
+module.exports = { validateCard, verifyOtp, getBalance, rollbackTransaction };

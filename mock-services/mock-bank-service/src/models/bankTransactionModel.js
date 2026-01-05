@@ -7,7 +7,7 @@ const BankTransactionSchema = new mongoose.Schema({
   otp: { type: String },
   otpExpires: { type: Date },
   otpAttempts: { type: Number, default: 0 }, // Track OTP attempts
-  status: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED'], default: 'PENDING' },
+  status: { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED', 'ROLLED_BACK'], default: 'PENDING' },
 });
 
 module.exports = mongoose.model('BankTransaction', BankTransactionSchema);

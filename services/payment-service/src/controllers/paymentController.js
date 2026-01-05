@@ -91,103 +91,16 @@ const initiatePayment = async (req, res) => {
   }
 };
 
-// const confirmPayment = async (req, res) => {
-//   // const { billId, otp } = req.body;
-//   const { providerRef, otp } = req.body;
-//   // 1 Find transaction
-// //  const txn = await Transaction.findOne({ billId, status: 'PENDING' });
-
-//   const txn = await Transaction.findOne({
-//     providerRef,
-//     status: 'PENDING'
-//   });
-
-//   if (txn.status !== 'PENDING') {
-//   return res.json({
-//     message: 'Transaction already processed',
-//     transaction: txn
-//   });
-// }
-
-
-//   console.log(txn);
-//   console.log(otp)
-//   if (!txn || txn.status !== 'PENDING') {
-//     return res.status(400).json({ message: 'Invalid or already completed transaction' });
-//   }
-
-//   try {
-//     // 2 Verify OTP via Payment Gateway 
-//     const verify = await axios.post(
-//       `${process.env.GATEWAY_URL}/api/gateway/verify-otp`,
-//          {
-//             cardNumber: txn.cardNumber, // must store cardNumber in Transaction
-//             amount: txn.amount,
-//             otp
-//           }
-//         );
-
-//     if (verify.data.status !== 'SUCCESS') {
-//       txn.status = 'FAILED';
-//       await txn.save();
-//       return res.status(400).json({ message: 'OTP verification failed' });
-//     }
-
-//     // 3 Execute business logic with rollback safety
-//     try {
-//       if (txn.purpose === 'BILL_PAYMENT') {
-//         await axios.post(`${process.env.BILLING_URL}/api/bills/mark-paid`, {
-//           billId: txn.billId,
-//         });
-//       }
-
-//       if (txn.purpose === 'TOP_UP') {
-//         await axios.post(`${process.env.USER_URL}/api/wallet/topup`, {
-//           userId: txn.userId,
-//           amount: txn.amount,
-//         });
-//       }
-
-//       // 4 Everything succeeded
-//       txn.status = 'COMPLETED';
-//       await txn.save();
-//       return res.json({ message: 'Payment completed', transaction: txn });
-
-//     } catch (businessErr) {
-//       // 5 Rollback transaction if downstream fails
-//       console.error('Business operation failed, rolling back:', businessErr.message);
-
-//       await axios.post(`${process.env.GATEWAY_URL}/api/gateway/rollback`, {
-//         providerRef: txn.providerRef,
-//         amount: txn.amount,
-//       });
-
-//       txn.status = 'ROLLED_BACK';
-//       await txn.save();
-
-//       return res.status(500).json({
-//         message: 'Payment rolled back due to downstream failure',
-//       });
-//     }
-
-//   } catch (err) {
-//     console.error('OTP verification or network failure:', err.message);
-//     txn.status = 'FAILED';
-//     await txn.save();
-//     return res.status(500).json({ message: 'Payment failed' });
-//   }
-// };
 
 const confirmPayment = async (req, res) => {
   const { providerRef, otp } = req.body;
 
   const txn = await Transaction.findOne({
     providerRef,
-    status: 'PENDING'
   });
 
   if (!txn) {
-    return res.status(400).json({ message: 'Invalid or completed transaction' });
+    return res.status(400).json({ message: 'Invalid transaction' });
   }
 
   // Idempotency guard
@@ -197,24 +110,36 @@ const confirmPayment = async (req, res) => {
 
   try {
     // Verify OTP via Gateway
-    const verify = await axios.post(
+        const verify = await axios.post(
       `${process.env.GATEWAY_URL}/api/gateway/verify-otp`,
-      {
-        providerRef,
-        otp
-      }
+      { providerRef, otp },
+      { validateStatus: () => true }
     );
 
-    if (verify.data.status !== 'SUCCESS') {
+    // OTP locked / attempts exceeded
+    if (verify.data.status === 'FAILED') {
       txn.status = 'FAILED';
       await txn.save();
-      return res.status(400).json({ message: 'OTP verification failed' });
+
+      return res.status(403).json({
+        message: verify.data.message || 'OTP attempts exceeded'
+      });
     }
 
+    // Wrong OTP → allow retry
+    if (verify.data.status !== 'SUCCESS') {
+      return res.status(400).json({
+        message: verify.data.message || 'Invalid OTP',
+        attemptsLeft: verify.data.attemptsLeft
+      });
+    }
+    // OTP success — bank has confirmed, money may be deducted
+    txn.paymentStage = 'BANK_CONFIRMED';
+    await txn.save();
+
+
     try {
-      console.log("Purpose : ",txn.purpose);
-      console.log("BillId : ",txn.billId);
-      // Business logic
+  // Business logic
       if (txn.purpose === 'BILL_PAYMENT') {
         await axios.post(`${process.env.BILLING_URL}/api/billing/mark-paid`, {
           billId: txn.billId
@@ -229,32 +154,59 @@ const confirmPayment = async (req, res) => {
       }
 
       txn.status = 'COMPLETED';
+      txn.paymentStage = 'BUSINESS_DONE';
       await txn.save();
-
       return res.json({ message: 'Payment completed', transaction: txn });
 
     } catch (businessErr) {
-      console.error('Downstream failed, rolling back:', businessErr.message);
+      console.error('Downstream failed, attempting rollback:', businessErr.message);
 
-      await axios.post(`${process.env.GATEWAY_URL}/api/gateway/rollback`, {
-        providerRef: txn.providerRef,
-        amount: txn.amount
-      });
+      try {
+        await axios.post(`${process.env.GATEWAY_URL}/api/gateway/rollback`, {
+          providerRef: txn.providerRef,
+          amount: txn.amount
+        });
 
-      txn.status = 'ROLLED_BACK';
-      await txn.save();
+        txn.status = 'ROLLED_BACK';
+        txn.paymentStage = 'BANK_CONFIRMED';
+        await txn.save();
 
-      return res.status(500).json({
-        message: 'Payment rolled back due to downstream failure'
-      });
+        return res.status(500).json({
+          message: 'Payment rolled back due to downstream failure'
+        });
+
+      } catch (rollbackErr) {
+        console.error('Rollback failed:', rollbackErr.message);
+
+        // **Important:** update DB to indicate rollback attempt failed
+        txn.status = 'ROLLBACK_FAILED';
+        txn.paymentStage = 'BANK_CONFIRMED';
+        await txn.save();
+
+        return res.status(500).json({
+          message: 'Payment failed and rollback failed',
+          error: rollbackErr.message
+        });
+      }
     }
 
   } catch (err) {
-    console.error('OTP verification/network error:', err.message);
+  console.error('OTP verification/network error:', err.message);
+
+  // If money may have been deducted, do NOT mark FAILED
+  // if (txn.status === 'PENDING') {
+  //   txn.status = 'FAILED';
+  //   await txn.save();
+  // }
+
+  // Only mark FAILED if the bank never confirmed payment
+  if (txn.paymentStage === 'OTP_PENDING') {
     txn.status = 'FAILED';
     await txn.save();
-    return res.status(500).json({ message: 'Payment failed' });
   }
+
+  return res.status(500).json({ message: 'Payment failed' });
+}
 };
 
 

@@ -63,11 +63,41 @@ router.post('/verify-otp', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('OTP verification failed:', err.message);
+      const data = err.response?.data;
 
-    return res.status(400).json({
+      return res.status(err.response?.status || 400).json({
+        status: data?.status || 'INVALID_OTP',
+        message: data?.message || 'Invalid OTP',
+        attemptsLeft: data?.attemptsLeft
+      });
+    }
+});
+
+router.post('/rollback', async (req, res) => {
+  const { providerRef, amount } = req.body;
+
+  if (!providerRef || !amount) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    // Forward rollback request to Bank
+    const bankResponse = await axios.post(
+      `${process.env.BANK_URL}/bank/rollback`,
+      { providerRef, amount }
+    );
+
+    return res.status(200).json({
+      status: bankResponse.data.status,
+      message: bankResponse.data.message,
+      transactionRef: providerRef
+    });
+
+  } catch (err) {
+    console.error('Rollback failed:', err.message);
+    return res.status(500).json({
       status: 'FAILED',
-      message: 'OTP verification failed'
+      message: 'Rollback failed at gateway'
     });
   }
 });
