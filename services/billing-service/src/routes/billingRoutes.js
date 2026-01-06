@@ -1,15 +1,14 @@
+// src/routes/billingRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getUserBills, generateBill, markBillPaid } = require('../controllers/billingController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, internalOnly } = require('../middleware/authMiddleware');
 
-// Get all bills for logged-in user
-router.get('/', protect, getUserBills);
+// User-facing endpoints (JWT or gateway calls)
+router.get('/', protect, getUserBills);          // User gets their bills
+router.post('/generate', protect, generateBill); // Generate a bill
 
-// Generate a new bill (could be called by admin/provisioning)
-// In production, could be triggered by cron job
-router.post('/generate', protect, generateBill);
-
+// Internal-only endpoint (gateway calls only)
 router.post('/mark-paid', markBillPaid);
 
 module.exports = router;
