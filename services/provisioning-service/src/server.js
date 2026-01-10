@@ -9,7 +9,7 @@ const packageRoutes = require('./routes/packageRoutes');
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 3007;
+const PORT = process.env.PORT || 5004;
 
 // Middleware
 app.use(cors()); // Enable CORS for frontend access

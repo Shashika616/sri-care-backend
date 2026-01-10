@@ -101,7 +101,7 @@ exports.paymentProxy = buildProxy(
 // Provisioning Service Proxy   
 exports.provisioningProxy = buildProxy(
   process.env.PROVISIONING_SERVICE_URL,
-  '/api/provisioning'
+  '/api/packages'
 );
 
 // Chat Service Proxy
