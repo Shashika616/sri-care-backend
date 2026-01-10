@@ -10,7 +10,7 @@ const topUpWallet = async (req, res) => {
   //   return res.status(401).json({ message: 'Not authorized' });
   // }
 
-  const { userId, amount } = req.body;
+  const { userId, amount, voice, data } = req.body;
   if (!userId || !amount) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
@@ -19,9 +19,16 @@ const topUpWallet = async (req, res) => {
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   user.walletBalance = (user.walletBalance || 0) + amount;
+  user.voice = (user.voice || 0) + voice;
+  user.data = (user.voice || 0) + data;
+
   await user.save();
 
-  res.json({ message: 'Wallet topped up', walletBalance: user.walletBalance });
+  res.json({
+     message: 'Wallet topped up', walletBalance: user.walletBalance, 
+     message: 'Voice Balance', voice: user.voice,
+     message: 'Data Balance', data: user.data
+    });
 };
 
 module.exports = { topUpWallet };
