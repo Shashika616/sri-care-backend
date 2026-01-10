@@ -1,4 +1,4 @@
-name: Build User Service
+name: Build Chat Service
 
 on:
   push:

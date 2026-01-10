@@ -1,12 +1,12 @@
-name: Build Mock Provisioning Service
+name: Build Provisioning Service
 
 on:
   push:
     branches:
       - live
     paths:
-      - "mock-services/mock-provisioning-gateway/**"
-      - ".github/workflows/mock-provisioning-gateway.yml"
+      - "services/provisioning-service/**"
+      - ".github/workflows/provisioning-service.yml"
 
 # This permission is required for GHCR to write packages
 permissions:
@@ -39,12 +39,12 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./mock-services/mock-provisioning-gateway
-          file: ./mock-services/mock-provisioning-gateway/Dockerfile
+          context: ./services/provisioning-service
+          file: ./services/provisioning-service/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ env.REPO_OWNER }}/mock-provisioning-gateway:latest
-            ghcr.io/${{ env.REPO_OWNER }}/mock-provisioning-gateway:${{ github.sha }}
+            ghcr.io/${{ env.REPO_OWNER }}/provisioning-service:latest
+            ghcr.io/${{ env.REPO_OWNER }}/provisioning-service:${{ github.sha }}
 
       # # 4. Trigger Render
       # - name: Trigger Render Deploy

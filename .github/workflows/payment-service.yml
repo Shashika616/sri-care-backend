@@ -1,12 +1,12 @@
-name: Build User Service
+name: Build Payment Service
 
 on:
   push:
     branches:
       - live
     paths:
-      - 'services/payment-service/**'
-      - '.github/workflows/payment-service.yml'
+      - "services/payment-service/**"
+      - ".github/workflows/payment-service.yml"
 
 # This permission is required for GHCR to write packages
 permissions:
@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
         env:
-          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_OWNER: "${{ github.repository_owner }}"
 
       # 3. Build and Push (Use env.REPO_OWNER now)
       - name: Build and push Docker image
@@ -45,7 +45,7 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_OWNER }}/payment-service:latest
             ghcr.io/${{ env.REPO_OWNER }}/payment-service:${{ github.sha }}
-      
+
       # # 4. Trigger Render
       # - name: Trigger Render Deploy
       #   run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_AUTH }}

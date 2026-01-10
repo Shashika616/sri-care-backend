@@ -1,12 +1,12 @@
-name: Build User Service
+name: Build Mock Payment Gateway Service
 
 on:
   push:
     branches:
       - live
     paths:
-      - 'mock-services/mock-payment-gateway/**'
-      - '.github/workflows/mock-payment-gateway.yml'
+      - "mock-services/mock-payment-gateway/**"
+      - ".github/workflows/mock-payment-gateway.yml"
 
 # This permission is required for GHCR to write packages
 permissions:
@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
         env:
-          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_OWNER: "${{ github.repository_owner }}"
 
       # 3. Build and Push (Use env.REPO_OWNER now)
       - name: Build and push Docker image
@@ -45,7 +45,7 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_OWNER }}/mock-payment-gateway:latest
             ghcr.io/${{ env.REPO_OWNER }}/mock-payment-gateway:${{ github.sha }}
-      
+
       # # 4. Trigger Render
       # - name: Trigger Render Deploy
       #   run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_AUTH }}
