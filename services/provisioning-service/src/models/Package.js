@@ -13,17 +13,21 @@ const packageSchema = new mongoose.Schema({
   },
   cost: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   description: {
     type: String,
     required: true
+  },
+  validity: {
+    type: Number,
+    required: true,
+    min: 1
   }
 }, {
-  timestamps: true // adds createdAt/updatedAt (optional)
+  timestamps: true
 });
 
-// Create compound index on (type, id) for fast lookups
-packageSchema.index({ type: 1, id: 1 });
-
+// No index on 'id' — we're not using it
 module.exports = mongoose.model('Package', packageSchema);
