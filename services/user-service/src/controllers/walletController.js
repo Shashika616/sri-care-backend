@@ -11,9 +11,12 @@ const topUpWallet = async (req, res) => {
   // }
 
   const { userId, amount, voice, data } = req.body;
+  console.log('Top-up request received:', req.body);
+
   if (!userId || !amount) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
+
 
   const user = await User.findById(userId);
   if (!user) return res.status(404).json({ message: 'User not found' });

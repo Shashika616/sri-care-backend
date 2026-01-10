@@ -8,7 +8,7 @@ const packageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['data', 'voice', 'VAS'],
+    enum: ['data', 'voice', 'combo', 'VAS'],
     required: true
   },
   cost: {
@@ -21,13 +21,20 @@ const packageSchema = new mongoose.Schema({
     required: true
   },
   validity: {
-    type: Number,
+    type: Number, // in days (0 = ongoing)
     required: true,
-    min: 1
+    min: 0
+  },
+  dataQuota: {
+    type: mongoose.Schema.Types.Mixed, // number (MB) or "unlimited"
+    default: null // optional
+  },
+  voiceQuota: {
+    type: mongoose.Schema.Types.Mixed, // number (minutes) or "unlimited"
+    default: null // optional
   }
 }, {
   timestamps: true
 });
 
-// No index on 'id' — we're not using it
 module.exports = mongoose.model('Package', packageSchema);

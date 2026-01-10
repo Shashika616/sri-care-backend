@@ -6,26 +6,23 @@ const {
     getServicePackages,
     getVoicePackages,
     getAllPackages,
+    activatePackage,
+    getSinglePackage
 
 } = require('../controllers/packageController');
 
 
-// const {
-//     activatePackage,
-//     getActivePackages
-// }= require('../controllers/packageActivationController');
+
 
 const router = express.Router();
 
 // Endpoints
+router.get("/single-package/:id", protect, getSinglePackage);
 router.get('/data', protect, getDataPackages);
 router.get('/vas', protect, getServicePackages);
 router.get('/voice', protect, getVoicePackages);
 router.get('/all', protect, getAllPackages);
-// Activate a package
-// router.post('/activate', protect, activatePackage);
-// // Get user's active packages
-// router.get('/my-packages', protect, getActivePackages);
+router.post('/activate', protect, activatePackage); 
 
 
 
