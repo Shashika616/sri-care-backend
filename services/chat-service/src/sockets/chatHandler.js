@@ -10,11 +10,14 @@ class ChatHandler {
 
   handleConnection(socket) {
     console.log(`🔌 New connection: ${socket.id}`);
+    const { id, name, role } = socket.user;
 
     // Customer joins chat
     socket.on('customer:join', async (data) => {
       try {
-        const { customerId, customerName } = data;
+        console.log(`👤 Customer ${id} attempting to join room:}`);
+        const customerId = socket.user.id;   // Verified by Middleware
+        const customerName = socket.user.name;
         const roomId = `room_${customerId}`;
 
         // Check for existing connections (multiple devices)
@@ -104,6 +107,21 @@ class ChatHandler {
         socket.role = 'agent';
 
         await agentManager.markAgentOnline(agentId, socket.id);
+
+        // Find all sessions already assigned to this agent that are still active
+        const existingSessions = await ChatSession.find({ 
+          agentId: agentId, 
+          status: { $in: ['active', 'transferred'] } 
+        });
+
+        // Send the list of existing customers to the agent
+        existingSessions.forEach(session => {
+          socket.emit('agent:new-customer', {
+            customerId: session.customerId,
+            customerName: session.customerName,
+            roomId: session.roomId
+          });
+        });
 
         const chatCount = await agentManager.getAgentChatCount(agentId);
 

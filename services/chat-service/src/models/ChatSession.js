@@ -12,7 +12,7 @@ const chatSessionSchema = new mongoose.Schema({
   },
   customerName: {
     type: String,
-    required: true
+    // required: true
   },
   agentId: {
     type: String,

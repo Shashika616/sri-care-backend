@@ -3,6 +3,8 @@ dotenv.config();
 
 const express = require('express');
 const cors = require('cors');
+const http = require('http');
+
 const gatewayRoutes = require('./routes/gatewayRoutes');
 
 
@@ -18,6 +20,8 @@ app.use('/api', gatewayRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'API Gateway running' });
 });
+
+const server = http.createServer(app);
 
 // Start server
 const PORT = process.env.PORT || 5000;

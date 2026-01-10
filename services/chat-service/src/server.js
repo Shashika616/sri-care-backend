@@ -8,6 +8,7 @@ const connectDB = require('./config/db');
 const { connectRedis } = require('./config/redis');
 const ChatHandler = require('./sockets/chatHandler');
 const SessionCleaner = require('./utils/sessionCleaner');
+const { socketAuth } = require('./middleware/authMiddleware');
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,7 +73,11 @@ app.get('/api/queue/status', async (req, res) => {
 
 // Initialize Socket.IO handler
 const chatHandler = new ChatHandler(io);
-io.on('connection', (socket) => chatHandler.handleConnection(socket));
+io.use(socketAuth);
+io.on('connection', (socket) => {
+  console.log(`Authenticated user connected: ${socket.user.name} (${socket.user.role})`);
+  chatHandler.handleConnection(socket);
+});
 
 // Global error handlers
 process.on('uncaughtException', (error) => {

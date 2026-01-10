@@ -414,23 +414,26 @@
     document.getElementById('customerConnect').addEventListener('click', () => {
       const name = document.getElementById('customerName').value;
       const id = document.getElementById('customerId').value;
+      const token = prompt("Enter JWT Token (simulating logged-in user)");
 
       if (!name || !id) {
         alert('Please enter both name and ID');
         return;
       }
 
-      customerSocket = io(SERVER_URL);
+      // Pass the token in the auth object
+        customerSocket = io(SERVER_URL, {
+          auth: {
+            token: token
+          }
+        });
 
       customerSocket.on('connect', () => {
         log('Customer connected', 'success');
         connectionCount++;
         document.getElementById('statConnections').textContent = connectionCount;
         
-        customerSocket.emit('customer:join', {
-          customerId: id,
-          customerName: name
-        });
+        customerSocket.emit('customer:join');
 
         currentCustomerRoom = `room_${id}`;
         
@@ -475,6 +478,10 @@
       customerSocket.on('chat:closed', (data) => {
         log('Chat closed: ' + data.reason, 'info');
         addMessage('customerChatBox', `Chat closed: ${data.reason}`, 'system', 'System');
+      });
+
+      customerSocket.on('connect_error', (err) => {
+        log(`Connection failed: ${err.message}`, 'error');
       });
 
       customerSocket.on('error', (data) => {
@@ -525,13 +532,18 @@
       const name = document.getElementById('agentName').value;
       const id = document.getElementById('agentId').value;
 
-      if (!name || !id) {
-        alert('Please enter both name and ID');
+      const token = prompt("Enter Agent JWT Token");
+
+      if (!name || !id || !token) {
+        alert('Please enter  name and ID and Token');
         return;
       }
 
-      agentSocket = io(SERVER_URL);
-
+      agentSocket = io(SERVER_URL, {
+        auth: {
+          token: token
+        }
+      });
       agentSocket.on('connect', () => {
         log('Agent connected', 'success');
         connectionCount++;
@@ -551,12 +563,14 @@
 
       agentSocket.on('agent:new-customer', (data) => {
         log(`New customer assigned: ${data.customerName}`, 'success');
-        
+        if ([...select.options].some(opt => opt.value === data.roomId)) return;
         const select = document.getElementById('agentRooms');
         const option = document.createElement('option');
         option.value = data.roomId;
         option.textContent = `${data.customerName} (${data.roomId})`;
         select.appendChild(option);
+
+        agentSocket.emit('agent:join-room', { roomId: data.roomId });
         
         addMessage('agentChatBox', `New customer: ${data.customerName}`, 'system', 'System');
       });
@@ -581,6 +595,12 @@
         log('Error: ' + data.message, 'error');
       });
     });
+    
+    agentSocket.on('connect_error', (err) => {
+  log(`Agent Connection Error: ${err.message}`, 'error');
+  document.getElementById('agentStatus').className = 'status disconnected';
+  document.getElementById('agentStatus').textContent = 'Auth Failed';
+});
 
     document.getElementById('agentRooms').addEventListener('change', (e) => {
       const roomId = e.target.value;

@@ -18,4 +18,7 @@ router.use('/payments', protect, gatewayController.paymentProxy);
 // PROVISIONING service (protected)
 router.use('/provisioning', protect, gatewayController.provisioningProxy);
 
+// Chat Service (protected)
+router.use('/api/chat',protect, gatewayController.chatProxy);
+
 module.exports = router;
